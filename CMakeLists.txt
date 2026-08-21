@@ -1,0 +1,47 @@
+cmake_minimum_required(VERSION 3.24)
+project(main LANGUAGES CXX C)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+find_package(PkgConfig REQUIRED)
+find_package(ncnn REQUIRED)
+pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET libavcodec libavformat libswscale libavutil)
+
+add_subdirectory(vendor/realcugan-ncnn-vulkan/src)
+
+# FetchContent
+include(FetchContent)
+
+FetchContent_Declare(
+  readerwriterqueue
+  GIT_REPOSITORY    https://github.com/cameron314/readerwriterqueue
+  GIT_TAG           master
+)
+FetchContent_MakeAvailable(readerwriterqueue)
+FetchContent_GetProperties(readerwriterqueue SOURCE_DIR readerwriterqueue_dir)
+
+FetchContent_Declare(
+  concurrentqueue
+  GIT_REPOSITORY    https://github.com/cameron314/concurrentqueue
+  GIT_TAG           master
+)
+FetchContent_MakeAvailable(concurrentqueue)
+FetchContent_GetProperties(concurrentqueue SOURCE_DIR concurrentqueue_dir)
+
+add_executable(main
+    src/main.cpp
+)
+
+target_include_directories(main PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/vendor/realcugan-ncnn-vulkan/src
+    ${readerwriterqueue_dir}
+    ${concurrentqueue_dir}
+)
+
+target_link_libraries(main PRIVATE
+    PkgConfig::FFMPEG
+    ncnn
+    realcugan
+)
