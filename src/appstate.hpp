@@ -1,8 +1,9 @@
 #pragma once
 
 #include "ffmpeg.hpp"
-#include "ff_encode.hpp"
+#include "encode.hpp"
 #include "realcugan.h"
+#include "rife.h"
 
 class AppState {
 public:
@@ -10,6 +11,11 @@ public:
     ff::VideoEncoder encoder;
     const int scale = 2;
     int tilesize = 0;
+    const char *realcugan_param_path = "/mnt/d/Linux/Project/vendor/realcugan-ncnn-vulkan/models/models-pro/up2x-conservative.param";
+    const char *realcugan_model_path = "/mnt/d/Linux/Project/vendor/realcugan-ncnn-vulkan/models/models-pro/up2x-conservative.bin";
+    const char *rife_model_path = "/mnt/d/Linux/Project/vendor/rife-ncnn-vulkan/models/rife-v4";
+    int x_frames = 1;
+    const int target_fps = 60;
 
     ~AppState() {
         shutdown();
@@ -32,6 +38,10 @@ public:
             if (!video_ctx)
                 return false;
             auto fps = av_q2d(video_ctx->framerate);
+            while (fps * x_frames < target_fps) {
+                x_frames++;
+            }
+            fps *= x_frames;
             
             if (!encoder.open(out_path, video_ctx->width * scale, video_ctx->height * scale, fps))
                 return false;
@@ -74,7 +84,7 @@ public:
         return true;
     }
 
-    RealCUGAN *alloc_realcugan() {
+    RealCUGAN *load_realcugan() {
         auto gpuid = ncnn::get_default_gpu_index();
 
         uint32_t heap_budget = ncnn::get_gpu_device(gpuid)->get_heap_budget();
@@ -118,10 +128,8 @@ public:
                 tilesize = 32;
         }
 
-        auto data = new RealCUGAN(gpuid, 0, 2);
-        auto paramfullpath = "/mnt/d/Linux/Project/vendor/realcugan-ncnn-vulkan/models/models-se/up2x-conservative.param";
-        auto modelfullpath = "/mnt/d/Linux/Project/vendor/realcugan-ncnn-vulkan/models/models-se/up2x-conservative.bin";
-        data->load(paramfullpath, modelfullpath);
+        auto data = new RealCUGAN(gpuid, 0, 1);
+        data->load(realcugan_param_path, realcugan_model_path);
 
         data->noise = -1;
         data->scale = scale;
@@ -131,34 +139,55 @@ public:
         return data;
     }
 
+    RIFE *load_rife() {
+        auto gpuid = ncnn::get_default_gpu_index();
+
+        auto data = new RIFE(gpuid, 0, 0, 0, 1, false, true);
+        data->load(rife_model_path);
+        return data;
+    }
+
     bool process() {
         AVFrame *frame = nullptr;
 
         ncnn::create_gpu_instance();
-        const RealCUGAN* realcugan = alloc_realcugan();
+        const RealCUGAN *scaler = load_realcugan();
+        const RIFE *vfi = load_rife();
 
+        ncnn::Mat prev_image;
         while (true) {
             while (video.video_frame_queue.try_dequeue(frame))
             {
-                auto inimage = ncnn::Mat(frame->width, frame->height, (void*)frame->data, 3, 3);
-                auto outimage = new ncnn::Mat(frame->width * realcugan->scale, frame->height * realcugan->scale, (size_t)inimage.elemsize, (int)inimage.elemsize);
-                realcugan->process(inimage, *outimage);
+                auto inimage = ncnn::Mat(frame->width, frame->height, (void*)frame->data[0], 3, 3);
+                auto outimage = ncnn::Mat(frame->width * scaler->scale, frame->height * scaler->scale, (size_t)inimage.elemsize, (int)inimage.elemsize);
+                scaler->process(inimage, outimage);
+                if (!prev_image.empty()) {
+                    for (auto i = 1; i < x_frames; i++) {
+                        auto new_image = ncnn::Mat(outimage.w, outimage.h, (size_t)outimage.elemsize, (int)outimage.elemsize);
+                        vfi->process(prev_image, outimage, (float) i / x_frames, new_image);
+                        encoder.video_frame_queue.enqueue(new_image);
+                    }
+                }
                 encoder.video_frame_queue.enqueue(outimage);
+                prev_image = outimage;
                 
                 ff::frame_recycle(frame);
             }
             if (video.is_eof.load(std::memory_order_acquire)) {
-                encoder.video_frame_queue.enqueue(nullptr);
+                encoder.video_frame_queue.enqueue(ncnn::Mat());
+                std::cout << "xvfi done.\n";
                 break;
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(20));
         }
+        prev_image.release();
 
         while (!encoder.is_eof.load(std::memory_order_acquire)) {
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
         }
 
-        delete realcugan;
+        delete scaler;
+        delete vfi;
         ncnn::destroy_gpu_instance();
 
         return true;

@@ -13,7 +13,6 @@ find_package(Threads)
 find_package(OpenMP)
 find_package(Vulkan REQUIRED)
 find_package(glslang REQUIRED)
-pkg_check_modules(libwebp REQUIRED IMPORTED_TARGET libwebp)
 
 macro(realcugan_add_shader SHADER_SRC)
     get_filename_component(SHADER_SRC_NAME_WE ${SHADER_SRC} NAME_WE)
@@ -57,15 +56,15 @@ realcugan_add_shader(realcugan_preproc_tta.comp)
 realcugan_add_shader(realcugan_postproc_tta.comp)
 realcugan_add_shader(realcugan_4x_postproc_tta.comp)
 
-add_custom_target(generate-spirv DEPENDS ${SHADER_SPV_HEX_FILES})
+add_custom_target(realcugan-spirv DEPENDS ${SHADER_SPV_HEX_FILES})
 
 add_library(realcugan realcugan.cpp)
 
 #set_property(TARGET realcugan-ncnn-vulkan PROPERTY CXX_STANDARD 11)
 
-add_dependencies(realcugan generate-spirv)
+add_dependencies(realcugan realcugan-spirv)
 
-set(REALCUGAN_LINK_LIBRARIES ncnn webp ${Vulkan_LIBRARY})
+set(REALCUGAN_LINK_LIBRARIES ncnn ${Vulkan_LIBRARY})
 
 if(USE_STATIC_MOLTENVK)
     find_library(CoreFoundation NAMES CoreFoundation)

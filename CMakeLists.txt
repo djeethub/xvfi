@@ -10,6 +10,7 @@ find_package(ncnn REQUIRED)
 pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET libavcodec libavformat libswscale libavutil)
 
 add_subdirectory(vendor/realcugan-ncnn-vulkan/src)
+add_subdirectory(vendor/rife-ncnn-vulkan/src)
 
 # FetchContent
 include(FetchContent)
@@ -36,6 +37,7 @@ add_executable(main
 
 target_include_directories(main PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/vendor/realcugan-ncnn-vulkan/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/vendor/rife-ncnn-vulkan/src
     ${readerwriterqueue_dir}
     ${concurrentqueue_dir}
 )
@@ -44,4 +46,5 @@ target_link_libraries(main PRIVATE
     PkgConfig::FFMPEG
     ncnn
     realcugan
+    rife
 )

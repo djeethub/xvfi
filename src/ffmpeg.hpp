@@ -373,7 +373,7 @@ public:
         AVCodecParameters *codec_params = format_ctx->streams[video_stream_index]->codecpar;
         const AVCodec *codec = avcodec_find_decoder(codec_params->codec_id);
         video_codec_ctx = avcodec_alloc_context3(codec);
-#ifdef __linux__
+/*#ifdef __linux__
         AVBufferRef *hw_device_ctx = nullptr;
         if (av_hwdevice_ctx_create(&hw_device_ctx, AV_HWDEVICE_TYPE_VAAPI, NULL, NULL, 0) == 0) {
             video_codec_ctx->hw_device_ctx = hw_device_ctx;
@@ -383,7 +383,7 @@ public:
         if (av_hwdevice_ctx_create(&hw_device_ctx, AV_HWDEVICE_TYPE_D3D11VA, NULL, NULL, 0) == 0) {
             video_codec_ctx->hw_device_ctx = hw_device_ctx;
         }
-#endif
+#endif*/
         video_codec_ctx->thread_count = 0;
         video_codec_ctx->thread_type = FF_THREAD_FRAME; // Or FF_THREAD_SLICE
         avcodec_parameters_to_context(video_codec_ctx, codec_params);
@@ -620,6 +620,7 @@ public:
                                 }
                                 else {
                                     auto new_frame = alloc_converted_frame();
+                                    setup_sws_context(frame);
                                     sws_scale(sws_ctx, frame->data, frame->linesize, 0, frame->height, new_frame->data, new_frame->linesize);
                                     av_frame_copy_props(new_frame, frame);
                                     video_frame_queue.enqueue(new_frame);
@@ -652,6 +653,7 @@ public:
                 break;
             if (read_result < 0) {
                 is_eof.store(true, std::memory_order_release);
+                std::cout << "decoder done.\n";
                 break;
             }
         }

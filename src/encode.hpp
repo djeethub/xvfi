@@ -24,7 +24,7 @@ private:
     int n_frame;
 
 public:
-    moodycamel::ReaderWriterQueue<ncnn::Mat *> video_frame_queue;
+    moodycamel::ReaderWriterQueue<ncnn::Mat> video_frame_queue;
     std::mutex mutex;
     std::condition_variable cv;
     Status status = Play;
@@ -55,6 +55,8 @@ public:
         video_codec_ctx->time_base = {1, fps};
         video_codec_ctx->framerate = {fps, 1};
         video_codec_ctx->pix_fmt = out_fmt;
+        video_codec_ctx->thread_count = 0;
+        video_codec_ctx->thread_type = FF_THREAD_FRAME;
 
         if (format_ctx->oformat->flags & AVFMT_GLOBALHEADER) {
             format_ctx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
@@ -139,9 +141,9 @@ public:
         if (is_eof.load(std::memory_order_relaxed))
             return LARGE_INTERVAL;
 
-        ncnn::Mat *mat;
+        ncnn::Mat mat;
         while (video_frame_queue.try_dequeue(mat)) {
-            if (mat == nullptr) {
+            if (mat.empty()) {
                 // Flush encoder
                 avcodec_send_frame(video_codec_ctx, nullptr);
                 while (avcodec_receive_packet(video_codec_ctx, packet) == 0) {
@@ -152,6 +154,7 @@ public:
 
                 av_write_trailer(format_ctx);
                 is_eof.store(true, std::memory_order_release);
+                std::cout << "encoder done.\n";
                 return LARGE_INTERVAL;
             }
 
@@ -159,9 +162,9 @@ public:
             if (!frame) frame = alloc_converted_frame();
             av_frame_make_writable(frame);
             
-            int linesize[4] = { (int)(mat->w * mat->c * mat->elemsize), 0, 0, 0 };
-            const uint8_t* src_data[4] = { (const uint8_t*)mat->data, nullptr, nullptr, nullptr };
-            sws_scale(sws_ctx, src_data, linesize, 0, mat->h, frame->data, frame->linesize);
+            int linesize[4] = { (int)(mat.w * mat.c * mat.elemsize), 0, 0, 0 };
+            const uint8_t* src_data[4] = { (const uint8_t*)mat.data, nullptr, nullptr, nullptr };
+            sws_scale(sws_ctx, src_data, linesize, 0, mat.h, frame->data, frame->linesize);
             frame->pts = n_frame++;
 
             // Push frame to encoder
@@ -172,8 +175,6 @@ public:
                 av_interleaved_write_frame(format_ctx, packet);
                 av_packet_unref(packet);
             }
-
-            delete mat;
         }
 
         return 0.02;
@@ -196,7 +197,7 @@ public:
         if (!thread.joinable()) {
             thread = std::thread(thread_worker, this);
 #ifdef __linux__
-            pthread_setname_np(thread.native_handle(), "media");
+            pthread_setname_np(thread.native_handle(), "encoder");
 #endif
         }
     }
