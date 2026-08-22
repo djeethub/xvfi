@@ -177,7 +177,7 @@ public:
             }
         }
 
-        return 0.02;
+        return 0.05;
     }
 
     static void thread_worker(VideoEncoder *video)

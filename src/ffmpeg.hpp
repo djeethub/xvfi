@@ -554,7 +554,7 @@ public:
         frame->height = video_codec_ctx->height;
 
         if (!converted_pool) {
-            int buffer_size = av_image_get_buffer_size(static_cast<AVPixelFormat>(frame->format), frame->width, frame->height, 32);
+            int buffer_size = av_image_get_buffer_size(static_cast<AVPixelFormat>(frame->format), frame->width, frame->height, 1);
             converted_pool = av_buffer_pool_init(buffer_size, NULL);
         }
 
@@ -564,7 +564,7 @@ public:
         // 3. Link the frame's data pointers to the pool buffer
         av_image_fill_arrays(frame->data, frame->linesize, 
                             frame->buf[0]->data, static_cast<AVPixelFormat>(frame->format), 
-                            frame->width, frame->height, 32);
+                            frame->width, frame->height, 1);
 
         return frame;
     }

@@ -8,8 +8,8 @@
       "binaryDir": "${sourceDir}/build/${hostSystemName}-${presetName}",
       "cacheVariables": {
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-        "CMAKE_CXX_FLAGS_RELEASE": "-O3 -DNDEBUG -std=c++20 -march=native -ffast-math",
-        "CMAKE_C_FLAGS_RELEASE": "-O3 -DNDEBUG -std=c11 -march=native -ffast-math",
+        "CMAKE_CXX_FLAGS_RELEASE": "-O3 -DNDEBUG -std=c++20 -march=native",
+        "CMAKE_C_FLAGS_RELEASE": "-O3 -DNDEBUG -std=c11 -march=native",
         "CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE": "ON",
         "CMAKE_INTERPROCEDURAL_OPTIMIZATION_JOBS": "4",
         "GLSLANG_TARGET_DIR": "/usr/lib/cmake"

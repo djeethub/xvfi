@@ -10,10 +10,9 @@ public:
     ff::VideoFile video;
     ff::VideoEncoder encoder;
     const int scale = 2;
-    int tilesize = 0;
     const char *realcugan_param_path = "/mnt/d/Linux/Project/vendor/realcugan-ncnn-vulkan/models/models-pro/up2x-conservative.param";
     const char *realcugan_model_path = "/mnt/d/Linux/Project/vendor/realcugan-ncnn-vulkan/models/models-pro/up2x-conservative.bin";
-    const char *rife_model_path = "/mnt/d/Linux/Project/vendor/rife-ncnn-vulkan/models/rife-v4";
+    const char *rife_model_path = "/mnt/d/Linux/Project/vendor/rife-ncnn-vulkan/models/rife-v4.6";
     int x_frames = 1;
     const int target_fps = 60;
 
@@ -87,6 +86,9 @@ public:
     RealCUGAN *load_realcugan() {
         auto gpuid = ncnn::get_default_gpu_index();
 
+        int tilesize = 0;
+        int prepadding = 0;
+
         uint32_t heap_budget = ncnn::get_gpu_device(gpuid)->get_heap_budget();
         if (scale == 2)
         {
@@ -100,6 +102,7 @@ public:
                 tilesize = 100;
             else
                 tilesize = 32;
+            prepadding = 18;
         }
         if (scale == 3)
         {
@@ -113,6 +116,7 @@ public:
                 tilesize = 100;
             else
                 tilesize = 32;
+            prepadding = 14;
         }
         if (scale == 4)
         {
@@ -126,6 +130,7 @@ public:
                 tilesize = 100;
             else
                 tilesize = 32;
+            prepadding = 19;
         }
 
         auto data = new RealCUGAN(gpuid, 0, 1);
@@ -134,7 +139,7 @@ public:
         data->noise = -1;
         data->scale = scale;
         data->tilesize = tilesize;
-        data->prepadding = 18;
+        data->prepadding = prepadding;
         data->syncgap = 3;
         return data;
     }
