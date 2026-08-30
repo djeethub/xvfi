@@ -6,7 +6,7 @@
 
 namespace ff {
 
-const AVPixelFormat out_fmt = AV_PIX_FMT_NV12;
+const AVPixelFormat out_fmt = AV_PIX_FMT_YUV420P;
 
 class VideoEncoder {
 private:
@@ -46,7 +46,12 @@ public:
             return false;
         }
 
-        const AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_H264);
+//        const AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_AV1);
+        const AVCodec* codec = avcodec_find_encoder_by_name("libsvtav1");
+        if (!codec) {
+            std::cerr << "Video encoder not found.\n";
+            return false;
+        }
         video_stream = avformat_new_stream(format_ctx, nullptr);
         video_codec_ctx = avcodec_alloc_context3(codec);
 
@@ -63,7 +68,7 @@ public:
         }
 
         AVDictionary* param_opts = nullptr;
-        av_dict_set(&param_opts, "preset", "slow", 0);
+        av_dict_set(&param_opts, "preset", "4", 0);
         avcodec_open2(video_codec_ctx, codec, &param_opts);
         av_dict_free(&param_opts);
 
@@ -177,7 +182,7 @@ public:
             }
         }
 
-        return 0.05;
+        return 0.04;
     }
 
     static void thread_worker(VideoEncoder *video)

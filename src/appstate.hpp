@@ -10,12 +10,21 @@ public:
     ff::VideoFile video;
     ff::VideoEncoder encoder;
     const int scale = 2;
+#ifdef __linux__
     const char *realcugan_param_path = "/mnt/d/Linux/Project/vendor/realcugan-ncnn-vulkan/models/models-pro/up2x-conservative.param";
     const char *realcugan_model_path = "/mnt/d/Linux/Project/vendor/realcugan-ncnn-vulkan/models/models-pro/up2x-conservative.bin";
     const char *rife_model_path = "/mnt/d/Linux/Project/vendor/rife-ncnn-vulkan/models/rife-v4.6";
+#else
+    const WCHAR *realcugan_param_path = L"D:/Linux/Project/vendor/realcugan-ncnn-vulkan/models/models-pro/up2x-conservative.param";
+    const WCHAR *realcugan_model_path = L"D:/Linux/Project/vendor/realcugan-ncnn-vulkan/models/models-pro/up2x-conservative.bin";
+    const WCHAR *rife_model_path = L"D:/Linux/Project/vendor/rife-ncnn-vulkan/models/rife-v4.6";
+#endif
     int x_frames = 1;
     const int target_fps = 60;
 
+    AppState() {
+        av_log_set_level(AV_LOG_WARNING);
+    }
     ~AppState() {
         shutdown();
     }
@@ -187,12 +196,13 @@ public:
         }
         prev_image.release();
 
-        while (!encoder.is_eof.load(std::memory_order_acquire)) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        }
-
         delete scaler;
         delete vfi;
+
+        while (!encoder.is_eof.load(std::memory_order_acquire)) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(40));
+        }
+
         ncnn::destroy_gpu_instance();
 
         return true;

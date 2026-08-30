@@ -15,22 +15,6 @@ add_subdirectory(vendor/rife-ncnn-vulkan/src)
 # FetchContent
 include(FetchContent)
 
-FetchContent_Declare(
-  readerwriterqueue
-  GIT_REPOSITORY    https://github.com/cameron314/readerwriterqueue
-  GIT_TAG           master
-)
-FetchContent_MakeAvailable(readerwriterqueue)
-FetchContent_GetProperties(readerwriterqueue SOURCE_DIR readerwriterqueue_dir)
-
-FetchContent_Declare(
-  concurrentqueue
-  GIT_REPOSITORY    https://github.com/cameron314/concurrentqueue
-  GIT_TAG           master
-)
-FetchContent_MakeAvailable(concurrentqueue)
-FetchContent_GetProperties(concurrentqueue SOURCE_DIR concurrentqueue_dir)
-
 add_executable(main
     src/main.cpp
 )
@@ -38,8 +22,8 @@ add_executable(main
 target_include_directories(main PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/vendor/realcugan-ncnn-vulkan/src
     ${CMAKE_CURRENT_SOURCE_DIR}/vendor/rife-ncnn-vulkan/src
-    ${readerwriterqueue_dir}
-    ${concurrentqueue_dir}
+    ${CMAKE_CURRENT_SOURCE_DIR}/vendor/readerwriterqueue
+    ${CMAKE_CURRENT_SOURCE_DIR}/vendor/concurrentqueue
 )
 
 target_link_libraries(main PRIVATE

@@ -36,13 +36,16 @@ int main(int argc, char** argv) {
         int n = 0;
         for (const auto& entry : files) {
             std::cout << ++n << "/" << files.size() << ": " << entry << std::endl;
-            if (!state.open(in_dir / entry, out_dir / entry)) {
+            if (!state.open((in_dir / entry).string(), (out_dir / entry).string())) {
                 std::cerr << "Failed to open " << entry << ".\n";
                 continue;
             }
+            auto start = std::chrono::steady_clock::now();
             if (!state.process()) {
                 std::cerr << "Failed to process " << entry << ".\n";
             }
+            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start);
+            std::cout << "Time: " << duration.count() << " ms" << std::endl;
         }
         std::cout << "All done.\n";
 

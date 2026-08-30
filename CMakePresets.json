@@ -10,9 +10,7 @@
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "CMAKE_CXX_FLAGS_RELEASE": "-O3 -DNDEBUG -std=c++20 -march=native",
         "CMAKE_C_FLAGS_RELEASE": "-O3 -DNDEBUG -std=c11 -march=native",
-        "CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE": "ON",
-        "CMAKE_INTERPROCEDURAL_OPTIMIZATION_JOBS": "4",
-        "GLSLANG_TARGET_DIR": "/usr/lib/cmake"
+        "CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE": "ON"
       }
     },
     {
@@ -41,21 +39,11 @@
         "rhs": "Windows"
       },
       "cacheVariables": {
-        "CMAKE_C_COMPILER": "gcc",
-        "CMAKE_CXX_COMPILER": "g++",
-        "CMAKE_PREFIX_PATH": "C:/Apps/local/cmake"
+        "GLSLANG_TARGET_DIR": "/ucrt64"
       },
       "environment": {
-        "PKG_CONFIG_PATH": "C:/Apps/msys64/ucrt64/lib/pkgconfig;C:/Apps/msys64/usr/local/lib/pkgconfig;C:/Apps/local/lib/pkgconfig",
-        "PATH": "C:/Apps/msys64/ucrt64/bin;C:/Apps/msys64/usr/local/bin;C:/Apps/local/bin;C:/Program Files/Git/usr/bin;$penv{PATH}"
-      },
-      "architecture": {
-        "value": "x64",
-        "strategy": "external"
-      },
-      "toolset": {
-        "value": "host=x64",
-        "strategy": "external"
+        "PKG_CONFIG_PATH": "C:/Apps/msys64/ucrt64/lib/pkgconfig;C:/Apps/msys64/usr/local/lib/pkgconfig",
+        "PATH": "C:/Apps/msys64/ucrt64/bin;C:/Apps/msys64/usr/local/bin;C:/Program Files/Git/usr/bin;$penv{PATH}"
       }
     },
     {

@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <vector>
+#include <filesystem>
 #include "benchmark.h"
 
 #include "rife_preproc.comp.hex.h"
@@ -78,15 +79,13 @@ RIFE::~RIFE()
 }
 
 #if _WIN32
-static void load_param_model(ncnn::Net& net, const std::wstring& modeldir, const wchar_t* name)
+static void load_param_model(ncnn::Net& net, const std::filesystem::path& modeldir, const std::wstring& name)
 {
-    wchar_t parampath[256];
-    wchar_t modelpath[256];
-    swprintf(parampath, 256, L"%s/%s.param", modeldir.c_str(), name);
-    swprintf(modelpath, 256, L"%s/%s.bin", modeldir.c_str(), name);
+    auto parampath = modeldir / (name + L".param");
+    auto modelpath = modeldir / (name + L".bin");
 
     {
-        FILE* fp = _wfopen(parampath, L"rb");
+        FILE* fp = _wfopen(parampath.c_str(), L"rb");
         if (!fp)
         {
             fwprintf(stderr, L"_wfopen %ls failed\n", parampath);
@@ -97,7 +96,7 @@ static void load_param_model(ncnn::Net& net, const std::wstring& modeldir, const
         fclose(fp);
     }
     {
-        FILE* fp = _wfopen(modelpath, L"rb");
+        FILE* fp = _wfopen(modelpath.c_str(), L"rb");
         if (!fp)
         {
             fwprintf(stderr, L"_wfopen %ls failed\n", modelpath);

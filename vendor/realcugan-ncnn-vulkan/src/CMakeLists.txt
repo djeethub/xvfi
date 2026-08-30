@@ -41,13 +41,6 @@ endif()
 # enable global link time optimization
 cmake_policy(SET CMP0069 NEW)
 set(CMAKE_POLICY_DEFAULT_CMP0069 NEW)
-include(CheckIPOSupported)
-check_ipo_supported(RESULT ipo_supported OUTPUT ipo_supported_output)
-if(ipo_supported)
-    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
-else()
-    message(WARNING "IPO is not supported: ${ipo_supported_output}")
-endif()
 
 realcugan_add_shader(realcugan_preproc.comp)
 realcugan_add_shader(realcugan_postproc.comp)
