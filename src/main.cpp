@@ -7,16 +7,41 @@
 namespace fs = std::filesystem;
 
 AppState state;
+int idx_in = -1;
+int idx_out = -1;
+
+bool parse_args(int argc, char** argv) {
+    if (argc < 3)
+        return false;
+
+    for (auto i = 1; i < argc; i++) {
+        if (argv[i][0] == '-') {
+            if (i + 1 >= argc)
+                return false;
+            state.encoder.args.emplace_back(argv[i] + 1, argv[i + 1]);
+            i++;
+        } else {
+            if (idx_in < 0)
+                idx_in = i;
+            else if (idx_out < 0)
+                idx_out = i;
+            else
+                return false;
+        }
+    }
+
+    return idx_in > 0 && idx_out > 0;
+}
 
 int main(int argc, char** argv) {
     try {
-        if (argc != 3) {
-            std::cerr << "Usage: " << argv[0] << " <in_dir> <out_dir>\n";
+        if (!parse_args(argc, argv)) {
+            std::cerr << "Usage: " << argv[0] << " [encoder args] <in_dir> <out_dir>\n";
             return 1;
         }
 
-        fs::path in_dir{argv[1]};
-        fs::path out_dir{argv[2]};
+        fs::path in_dir{argv[idx_in]};
+        fs::path out_dir{argv[idx_out]};
 
         std::unordered_set<std::string> files;
 //        files.reserve(10000); // Adjust based on expected scale

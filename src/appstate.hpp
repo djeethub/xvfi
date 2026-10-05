@@ -45,7 +45,11 @@ public:
             auto video_ctx = video.get_video_ctx();
             if (!video_ctx)
                 return false;
-            auto fps = av_q2d(video_ctx->framerate);
+            auto fps = video.get_fps();
+            if (fps == 0) {
+                std::cout << "fps not available.";
+                return false;
+            }
             while (fps * x_frames < target_fps) {
                 x_frames++;
             }

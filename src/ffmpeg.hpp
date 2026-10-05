@@ -704,5 +704,20 @@ public:
         if (thread.joinable())
             thread.join();
     }
+
+    double get_fps() {
+        auto fps = av_q2d(video_codec_ctx->framerate);
+        if (fps == 0) {
+            auto stream = format_ctx->streams[video_stream_index];
+            fps = av_q2d(stream->avg_frame_rate);
+            if (fps == 0) {
+                fps = av_q2d(stream->r_frame_rate);
+                if (fps == 0) {
+                    fps = 1.0 / av_q2d(video_codec_ctx->time_base);
+                }
+            }
+        }
+        return fps;
+    }
 };
 } // namespace ff

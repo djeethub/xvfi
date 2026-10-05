@@ -6,7 +6,7 @@
 
 namespace ff {
 
-const AVPixelFormat out_fmt = AV_PIX_FMT_YUV420P;
+const AVPixelFormat out_fmt = AV_PIX_FMT_YUV420P10LE;
 
 class VideoEncoder {
 private:
@@ -29,6 +29,7 @@ public:
     std::condition_variable cv;
     Status status = Play;
     std::atomic<bool> is_eof;
+    std::vector<std::pair<std::string, std::string>> args;
 
     ~VideoEncoder() {
         close();
@@ -68,7 +69,9 @@ public:
         }
 
         AVDictionary* param_opts = nullptr;
-        av_dict_set(&param_opts, "preset", "4", 0);
+        for (auto arg : args) {
+            av_dict_set(&param_opts, arg.first.c_str(), arg.second.c_str(), 0);
+        }
         avcodec_open2(video_codec_ctx, codec, &param_opts);
         av_dict_free(&param_opts);
 
