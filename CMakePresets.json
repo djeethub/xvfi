@@ -39,7 +39,9 @@
         "rhs": "Windows"
       },
       "cacheVariables": {
-        "GLSLANG_TARGET_DIR": "/ucrt64"
+        "GLSLANG_TARGET_DIR": "/ucrt64",
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++"
       },
       "environment": {
         "PKG_CONFIG_PATH": "C:/Apps/msys64/ucrt64/lib/pkgconfig;C:/Apps/msys64/usr/local/lib/pkgconfig",

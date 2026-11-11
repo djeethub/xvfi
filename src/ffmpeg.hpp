@@ -234,11 +234,11 @@ public:
             close();
             return false;
         }
-        start_time = format_ctx->start_time == AV_NOPTS_VALUE ? 0.0 : static_cast<double>(format_ctx->start_time) * AV_TIME_BASE;
+        start_time = 0;//format_ctx->start_time == AV_NOPTS_VALUE ? 0.0 : static_cast<double>(format_ctx->start_time) * AV_TIME_BASE;
         duration = static_cast<double>(format_ctx->duration) / AV_TIME_BASE;
         if (!packet) packet = av_packet_alloc();
         if (!frame) frame = frame_pool.alloc();
-        is_eof.store(false, std::memory_order_release);
+        is_eof.store(false, std::memory_order_relaxed);
         last_audio_time = start_time;
         last_video_time = start_time;
         return true;
@@ -248,15 +248,15 @@ public:
         if (!stream || !stream->metadata) {
             return "";
         }
-        
+
         // Look up the key in the stream's metadata dictionary
         AVDictionaryEntry* entry = av_dict_get(stream->metadata, key, nullptr, 0);
         if (entry && entry->value) {
             return std::string(entry->value);
         }
-        
+
         return "";
-    }    
+    }
 
     bool find_subtitle_stream()
     {
@@ -368,29 +368,54 @@ public:
         return true;
     }
 
-    bool open_video_decoder()
-    {
-        AVCodecParameters *codec_params = format_ctx->streams[video_stream_index]->codecpar;
-        const AVCodec *codec = avcodec_find_decoder(codec_params->codec_id);
+    bool open_video_decoder(const AVStream *stream, bool hwdec) {
+        auto codec_params = stream->codecpar;
+        const AVCodec *codec = nullptr;
+        if (codec_params->codec_id == AV_CODEC_ID_AV1 && hwdec)
+            codec = avcodec_find_decoder_by_name("av1");
+        else
+            codec = avcodec_find_decoder(codec_params->codec_id);
+        if (!codec)
+            return false;
         video_codec_ctx = avcodec_alloc_context3(codec);
-/*#ifdef __linux__
-        AVBufferRef *hw_device_ctx = nullptr;
-        if (av_hwdevice_ctx_create(&hw_device_ctx, AV_HWDEVICE_TYPE_VAAPI, NULL, NULL, 0) == 0) {
-            video_codec_ctx->hw_device_ctx = hw_device_ctx;
-        }
+        if (hwdec) {
+#ifdef __linux__
+            AVBufferRef *hw_device_ctx = nullptr;
+            if (av_hwdevice_ctx_create(&hw_device_ctx, AV_HWDEVICE_TYPE_VAAPI, NULL, NULL, 0) == 0) {
+                video_codec_ctx->hw_device_ctx = hw_device_ctx;
+            }
 #else
-        AVBufferRef *hw_device_ctx = nullptr;
-        if (av_hwdevice_ctx_create(&hw_device_ctx, AV_HWDEVICE_TYPE_D3D11VA, NULL, NULL, 0) == 0) {
-            video_codec_ctx->hw_device_ctx = hw_device_ctx;
+            AVBufferRef *hw_device_ctx = nullptr;
+            if (av_hwdevice_ctx_create(&hw_device_ctx, AV_HWDEVICE_TYPE_D3D11VA, NULL, NULL, 0) == 0) {
+                video_codec_ctx->hw_device_ctx = hw_device_ctx;
+            }
+#endif
+        } else {
+            video_codec_ctx->thread_count = 0;
+            video_codec_ctx->thread_type = FF_THREAD_FRAME; // Or FF_THREAD_SLICE
         }
-#endif*/
-        video_codec_ctx->thread_count = 0;
-        video_codec_ctx->thread_type = FF_THREAD_FRAME; // Or FF_THREAD_SLICE
         avcodec_parameters_to_context(video_codec_ctx, codec_params);
-        avcodec_open2(video_codec_ctx, codec, nullptr);
+        auto err = avcodec_open2(video_codec_ctx, codec, nullptr);
+        if (err) {
+            avcodec_free_context(&video_codec_ctx);
+            return false;
+        }
         video_time_base = av_q2d(format_ctx->streams[video_stream_index]->time_base);
-//        printf("av format: %i -> %i\n", video_codec_ctx->pix_fmt, finalPixelFormat);
         return true;
+    }
+
+    bool open_video_decoder(bool hwdec = true)
+    {
+        auto stream = format_ctx->streams[video_stream_index];
+        AVCodecParameters *codec_params = stream->codecpar;
+
+        switch (codec_params->format) {
+            case AV_PIX_FMT_GRAY8:
+                hwdec = false;
+        }
+        if (hwdec && open_video_decoder(stream, true))
+            return true;
+        return open_video_decoder(stream, false);
     }
 
     bool open_subtitle_decoder() {
@@ -442,7 +467,7 @@ public:
                 avcodec_flush_buffers(video_codec_ctx);
             if (subtitle_codec_ctx)
                 avcodec_flush_buffers(subtitle_codec_ctx);
-            is_eof.store(false, std::memory_order_release);
+            is_eof.store(false, std::memory_order_relaxed);
         }
         return seek_result;
     }
@@ -467,7 +492,7 @@ public:
             is_seeking = false;
             set_skip(AVDISCARD_DEFAULT, AVDISCARD_DEFAULT, AVDISCARD_DEFAULT);
         }
-    }    
+    }
 
     std::vector<ChapterData> read_chapters() {
         std::vector<ChapterData> chapter_list;
@@ -508,7 +533,7 @@ public:
         char errbuf[AV_ERROR_MAX_STRING_SIZE];
         av_strerror(errnum, errbuf, sizeof(errbuf));
         return std::string(errbuf);
-    }    
+    }
 
     void select_subtitle(int idx) {
         if (subtitle_stream_idx != idx) {
@@ -560,10 +585,10 @@ public:
 
         // 2. Instead of av_frame_get_buffer, grab a buffer from your pool
         frame->buf[0] = av_buffer_pool_get(converted_pool);
-            
+
         // 3. Link the frame's data pointers to the pool buffer
-        av_image_fill_arrays(frame->data, frame->linesize, 
-                            frame->buf[0]->data, static_cast<AVPixelFormat>(frame->format), 
+        av_image_fill_arrays(frame->data, frame->linesize,
+                            frame->buf[0]->data, static_cast<AVPixelFormat>(frame->format),
                             frame->width, frame->height, 1);
 
         return frame;
@@ -617,8 +642,7 @@ public:
                                     av_frame_copy_props(new_frame, frame);
                                     video_frame_queue.enqueue(new_frame);
                                     frame_recycle(sw_frame);
-                                }
-                                else {
+                                } else {
                                     auto new_frame = alloc_converted_frame();
                                     setup_sws_context(frame);
                                     sws_scale(sws_ctx, frame->data, frame->linesize, 0, frame->height, new_frame->data, new_frame->linesize);
@@ -652,7 +676,7 @@ public:
             if (!preload && last_video_time > play_time)
                 break;
             if (read_result < 0) {
-                is_eof.store(true, std::memory_order_release);
+                is_eof.store(true, std::memory_order_relaxed);
                 std::cout << "decoder done.\n";
                 break;
             }

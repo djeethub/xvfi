@@ -12,9 +12,6 @@ pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET libavcodec libavformat libswsc
 add_subdirectory(vendor/realcugan-ncnn-vulkan/src)
 add_subdirectory(vendor/rife-ncnn-vulkan/src)
 
-# FetchContent
-include(FetchContent)
-
 add_executable(main
     src/main.cpp
 )

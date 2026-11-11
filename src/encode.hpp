@@ -37,7 +37,7 @@ public:
         av_frame_free(&frame);
     }
 
-    bool open(const std::string &filename, int width, int height, int fps)
+    bool open(const std::string &filename, int width, int height, int fps, AVDictionary *metadata)
     {
         close();
 
@@ -87,6 +87,8 @@ public:
                 return false;
             }
         }
+        if (metadata)
+            av_dict_copy(&format_ctx->metadata, metadata, 0);
         err = avformat_write_header(format_ctx, nullptr);
         if (err < 0) {
             std::cerr << "avformat_write_header failed: " << VideoFile::av_err2string(err) << std::endl;
@@ -136,10 +138,10 @@ public:
 
         // 2. Instead of av_frame_get_buffer, grab a buffer from your pool
         frame->buf[0] = av_buffer_pool_get(converted_pool);
-            
+
         // 3. Link the frame's data pointers to the pool buffer
-        av_image_fill_arrays(frame->data, frame->linesize, 
-                            frame->buf[0]->data, static_cast<AVPixelFormat>(frame->format), 
+        av_image_fill_arrays(frame->data, frame->linesize,
+                            frame->buf[0]->data, static_cast<AVPixelFormat>(frame->format),
                             frame->width, frame->height, 32);
 
         return frame;
@@ -161,7 +163,7 @@ public:
                 }
 
                 av_write_trailer(format_ctx);
-                is_eof.store(true, std::memory_order_release);
+                is_eof.store(true, std::memory_order_relaxed);
                 std::cout << "encoder done.\n";
                 return LARGE_INTERVAL;
             }
@@ -169,7 +171,7 @@ public:
             // Allocate YUV Frame container for the encoder
             if (!frame) frame = alloc_converted_frame();
             av_frame_make_writable(frame);
-            
+
             int linesize[4] = { (int)(mat.w * mat.c * mat.elemsize), 0, 0, 0 };
             const uint8_t* src_data[4] = { (const uint8_t*)mat.data, nullptr, nullptr, nullptr };
             sws_scale(sws_ctx, src_data, linesize, 0, mat.h, frame->data, frame->linesize);

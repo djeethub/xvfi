@@ -4,7 +4,6 @@
 
 #include <algorithm>
 #include <vector>
-#include <filesystem>
 #include "benchmark.h"
 
 #include "rife_preproc.comp.hex.h"
@@ -25,7 +24,7 @@
 
 DEFINE_LAYER_CREATOR(Warp)
 
-RIFE::RIFE(int gpuid, bool _tta_mode, bool _tta_temporal_mode, bool _uhd_mode, int _num_threads, bool _rife_v2, bool _rife_v4)
+RIFE::RIFE(int gpuid, bool _tta_mode, bool _tta_temporal_mode, bool _uhd_mode, int _num_threads, bool _rife_v2, bool _rife_v4, int _padding)
 {
     vkdev = gpuid == -1 ? 0 : ncnn::get_gpu_device(gpuid);
 
@@ -45,6 +44,7 @@ RIFE::RIFE(int gpuid, bool _tta_mode, bool _tta_temporal_mode, bool _uhd_mode, i
     num_threads = _num_threads;
     rife_v2 = _rife_v2;
     rife_v4 = _rife_v4;
+    padding = _padding;
 }
 
 RIFE::~RIFE()
@@ -79,10 +79,10 @@ RIFE::~RIFE()
 }
 
 #if _WIN32
-static void load_param_model(ncnn::Net& net, const std::filesystem::path& modeldir, const std::wstring& name)
+static void load_param_model(ncnn::Net& net, const std::wstring& modeldir, const wchar_t* name)
 {
-    auto parampath = modeldir / (name + L".param");
-    auto modelpath = modeldir / (name + L".bin");
+    std::wstring parampath = modeldir + L"/" + name + L".param";
+    std::wstring modelpath = modeldir + L"/" + name + L".bin";
 
     {
         FILE* fp = _wfopen(parampath.c_str(), L"rb");
@@ -2495,8 +2495,10 @@ int RIFE::process_v4(const ncnn::Mat& in0image, const ncnn::Mat& in1image, float
     opt.staging_vkallocator = staging_vkallocator;
 
     // pad to 32n
-    int w_padded = (w + 31) / 32 * 32;
-    int h_padded = (h + 31) / 32 * 32;
+    int w_padded, h_padded;
+    
+    w_padded = (w + padding - 1) / padding * padding;
+    h_padded = (h + padding - 1) / padding * padding;
 
     const size_t in_out_tile_elemsize = opt.use_fp16_storage ? 2u : 4u;
 
@@ -3225,9 +3227,10 @@ int RIFE::process_v4_cpu(const ncnn::Mat& in0image, const ncnn::Mat& in1image, f
     ncnn::Option opt = flownet.opt;
 
     // pad to 32n
-    int w_padded = (w + 31) / 32 * 32;
-    int h_padded = (h + 31) / 32 * 32;
-
+    int w_padded, h_padded;
+    w_padded = (w + padding - 1) / padding * padding;
+    h_padded = (h + padding - 1) / padding * padding;
+    
     ncnn::Mat in0;
     ncnn::Mat in1;
     {

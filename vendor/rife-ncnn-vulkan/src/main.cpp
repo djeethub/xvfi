@@ -118,6 +118,8 @@ static void print_usage()
     fprintf(stdout, "  -z                   enable temporal tta mode\n");
     fprintf(stdout, "  -u                   enable UHD mode\n");
     fprintf(stderr, "  -f pattern-format    output image filename pattern format (%%08d.jpg/png/webp, default=ext/%%08d.png)\n");
+    fprintf(stderr, "  -q                   webp image quality (0-100)\n");
+    fprintf(stderr, "  -l                   list out available gpu devices\n");
 }
 
 static int decode_image(const path_t& imagepath, ncnn::Mat& image, int* webp)
@@ -189,7 +191,7 @@ static int decode_image(const path_t& imagepath, ncnn::Mat& image, int* webp)
     return 0;
 }
 
-static int encode_image(const path_t& imagepath, const ncnn::Mat& image)
+static int encode_image(const path_t& imagepath, const ncnn::Mat& image, float quality = 100.0)
 {
     int success = 0;
 
@@ -197,7 +199,7 @@ static int encode_image(const path_t& imagepath, const ncnn::Mat& image)
 
     if (ext == PATHSTR("webp") || ext == PATHSTR("WEBP"))
     {
-        success = webp_save(imagepath.c_str(), image.w, image.h, image.elempack, (const unsigned char*)image.data);
+        success = webp_save(imagepath.c_str(), image.w, image.h, image.elempack, (const unsigned char*)image.data, quality);
     }
     else if (ext == PATHSTR("png") || ext == PATHSTR("PNG"))
     {
@@ -369,12 +371,14 @@ class SaveThreadParams
 {
 public:
     int verbose;
+    float quality;
 };
 
 void* save(void* args)
 {
     const SaveThreadParams* stp = (const SaveThreadParams*)args;
     const int verbose = stp->verbose;
+    const float quality = stp->quality;
 
     for (;;)
     {
@@ -385,7 +389,7 @@ void* save(void* args)
         if (v.id == -233)
             break;
 
-        int ret = encode_image(v.outpath, v.outimage);
+        int ret = encode_image(v.outpath, v.outimage, quality);
 
         // free input pixel data
         {
@@ -426,7 +430,7 @@ void* save(void* args)
 #if _WIN32
                 fwprintf(stderr, L"%ls %ls %f -> %ls done\n", v.in0path.c_str(), v.in1path.c_str(), v.timestep, v.outpath.c_str());
 #else
-                fprintf(stderr, "%s %s %f -> %s done\n", v.in0path.c_str(), v.in1path.c_str(), v.timestep, v.outpath.c_str());
+                fprintf(stderr, "%s %s %f -> %s done (q - %f%)\n", v.in0path.c_str(), v.in1path.c_str(), v.timestep, v.outpath.c_str(), quality);
 #endif
             }
         }
@@ -454,6 +458,7 @@ int main(int argc, char** argv)
     std::vector<int> jobs_proc;
     int jobs_save = 2;
     int verbose = 0;
+    float quality = 100.0;
     int tta_mode = 0;
     int tta_temporal_mode = 0;
     int uhd_mode = 0;
@@ -462,7 +467,7 @@ int main(int argc, char** argv)
 #if _WIN32
     setlocale(LC_ALL, "");
     wchar_t opt;
-    while ((opt = getopt(argc, argv, L"0:1:i:o:n:s:m:g:j:f:vxzuh")) != (wchar_t)-1)
+    while ((opt = getopt(argc, argv, L"0:1:i:o:n:s:m:g:j:f:q:vxzulh")) != (wchar_t)-1)
     {
         switch (opt)
         {
@@ -497,6 +502,9 @@ int main(int argc, char** argv)
         case L'f':
             pattern_format = optarg;
             break;
+        case L'q':
+            quality = _wtof(optarg);
+            break;
         case L'v':
             verbose = 1;
             break;
@@ -509,6 +517,14 @@ int main(int argc, char** argv)
         case L'u':
             uhd_mode = 1;
             break;
+        case L'l':
+            {
+            std::string text;
+            for (int i=0; i < ncnn::get_gpu_count(); i++)
+                text += std::to_string(i) + ": " + ncnn::get_gpu_info(i).device_name() + "\n";
+            return -1;
+            break;
+            }
         case L'h':
         default:
             print_usage();
@@ -517,7 +533,7 @@ int main(int argc, char** argv)
     }
 #else // _WIN32
     int opt;
-    while ((opt = getopt(argc, argv, "0:1:i:o:n:s:m:g:j:f:vxzuh")) != -1)
+    while ((opt = getopt(argc, argv, "0:1:i:o:n:s:m:g:j:f:q:vxzulh")) != -1)
     {
         switch (opt)
         {
@@ -552,6 +568,9 @@ int main(int argc, char** argv)
         case 'f':
             pattern_format = optarg;
             break;
+        case 'q':
+            quality = atof(optarg);
+            break;
         case 'v':
             verbose = 1;
             break;
@@ -564,6 +583,15 @@ int main(int argc, char** argv)
         case 'u':
             uhd_mode = 1;
             break;
+        case 'l':
+            {
+            std::string text;
+            for (int i=0; i < ncnn::get_gpu_count(); i++)
+                text += std::to_string(i) + ": " + ncnn::get_gpu_info(i).device_name() + "\n";
+            return -1;
+            break;
+            
+            }
         case 'h':
         default:
             print_usage();
@@ -657,10 +685,23 @@ int main(int argc, char** argv)
 
     bool rife_v2 = false;
     bool rife_v4 = false;
+    int padding = 32;
     if (model.find(PATHSTR("rife-v2")) != path_t::npos)
     {
         // fine
         rife_v2 = true;
+    }
+    else if (model.find(PATHSTR("rife-v3.6")) != path_t::npos)
+    {
+
+        rife_v4 = true;
+
+    }
+    else if (model.find(PATHSTR("rife-v3.9")) != path_t::npos)
+    {
+
+        rife_v4 = true;
+
     }
     else if (model.find(PATHSTR("rife-v3")) != path_t::npos)
     {
@@ -668,6 +709,23 @@ int main(int argc, char** argv)
         rife_v2 = true;
     }
     else if (model.find(PATHSTR("rife-v4")) != path_t::npos)
+    {
+        // fine
+        rife_v4 = true;
+        if (model.find(PATHSTR("rife-v4.25")) != path_t::npos)
+        {
+            padding = 64;
+        }
+        if (model.find(PATHSTR("rife-v4.25-lite")) != path_t::npos)
+        {
+            padding = 128;
+        }
+        if (model.find(PATHSTR("rife-v4.26")) != path_t::npos)
+        {
+            padding = 64;
+        }
+    }
+    else if (model.find(PATHSTR("rife-v5")) != path_t::npos)
     {
         // fine
         rife_v4 = true;
@@ -822,7 +880,7 @@ int main(int argc, char** argv)
         {
             int num_threads = gpuid[i] == -1 ? jobs_proc[i] : 1;
 
-            rife[i] = new RIFE(gpuid[i], tta_mode, tta_temporal_mode, uhd_mode, num_threads, rife_v2, rife_v4);
+            rife[i] = new RIFE(gpuid[i], tta_mode, tta_temporal_mode, uhd_mode, num_threads, rife_v2, rife_v4, padding);
 
             rife[i]->load(modeldir);
         }
@@ -868,6 +926,7 @@ int main(int argc, char** argv)
             // save image
             SaveThreadParams stp;
             stp.verbose = verbose;
+            stp.quality = quality;
 
             std::vector<ncnn::Thread*> save_threads(jobs_save);
             for (int i=0; i<jobs_save; i++)

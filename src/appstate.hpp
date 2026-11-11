@@ -13,11 +13,11 @@ public:
 #ifdef __linux__
     const char *realcugan_param_path = "/mnt/d/Linux/Project/vendor/realcugan-ncnn-vulkan/models/models-pro/up2x-conservative.param";
     const char *realcugan_model_path = "/mnt/d/Linux/Project/vendor/realcugan-ncnn-vulkan/models/models-pro/up2x-conservative.bin";
-    const char *rife_model_path = "/mnt/d/Linux/Project/vendor/rife-ncnn-vulkan/models/rife-v4.6";
+    const char *rife_model_path = "/mnt/d/Linux/Project/vendor/rife-ncnn-vulkan/models/rife-v4.26";
 #else
     const WCHAR *realcugan_param_path = L"D:/Linux/Project/vendor/realcugan-ncnn-vulkan/models/models-pro/up2x-conservative.param";
     const WCHAR *realcugan_model_path = L"D:/Linux/Project/vendor/realcugan-ncnn-vulkan/models/models-pro/up2x-conservative.bin";
-    const WCHAR *rife_model_path = L"D:/Linux/Project/vendor/rife-ncnn-vulkan/models/rife-v4.6";
+    const WCHAR *rife_model_path = L"D:/Linux/Project/vendor/rife-ncnn-vulkan/models/rife-v4.26";
 #endif
     int x_frames = 1;
     const int target_fps = 60;
@@ -54,8 +54,9 @@ public:
                 x_frames++;
             }
             fps *= x_frames;
-            
-            if (!encoder.open(out_path, video_ctx->width * scale, video_ctx->height * scale, fps))
+
+            auto format_ctx = video.get_format_ctx();
+            if (!encoder.open(out_path, video_ctx->width * scale, video_ctx->height * scale, fps, format_ctx->metadata))
                 return false;
             video.seek_time = video.get_start_time();
             video.is_seeking = true;
@@ -160,7 +161,22 @@ public:
     RIFE *load_rife() {
         auto gpuid = ncnn::get_default_gpu_index();
 
-        auto data = new RIFE(gpuid, 0, 0, 0, 1, false, true);
+        int padding = 32;
+/*        if (model.find(PATHSTR("rife-v4.25")) != path_t::npos)
+        {
+            padding = 64;
+        }
+        if (model.find(PATHSTR("rife-v4.25-lite")) != path_t::npos)
+        {
+            padding = 128;
+        }
+        if (model.find(PATHSTR("rife-v4.26")) != path_t::npos)
+        {
+            padding = 64;
+        }*/
+        padding = 64;   // rife-v4.26
+
+        auto data = new RIFE(gpuid, 0, 0, 0, 1, false, true, padding);
         data->load(rife_model_path);
         return data;
     }
@@ -188,10 +204,10 @@ public:
                 }
                 encoder.video_frame_queue.enqueue(outimage);
                 prev_image = outimage;
-                
+
                 ff::frame_recycle(frame);
             }
-            if (video.is_eof.load(std::memory_order_acquire)) {
+            if (video.is_eof.load(std::memory_order_relaxed)) {
                 encoder.video_frame_queue.enqueue(ncnn::Mat());
                 std::cout << "xvfi done.\n";
                 break;
@@ -203,7 +219,7 @@ public:
         delete scaler;
         delete vfi;
 
-        while (!encoder.is_eof.load(std::memory_order_acquire)) {
+        while (!encoder.is_eof.load(std::memory_order_relaxed)) {
             std::this_thread::sleep_for(std::chrono::milliseconds(40));
         }
 
